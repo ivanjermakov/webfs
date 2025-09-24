@@ -1,13 +1,11 @@
 import { createReadStream } from "fs";
 import { readdir, stat } from "fs/promises";
-import http from "http";
-import path from "path";
+import { createServer, IncomingMessage, ServerResponse } from "http";
+import { extname, join, normalize, relative, sep } from "path";
+import { exit } from "process";
 
-const port = parseInt(process.env.WEBFS_PORT || "3000", 10);
-const root = process.env.WEBFS_ROOT || process.cwd();
-
-function streamFile(filePath: string, res: http.ServerResponse) {
-    const ext = path.extname(filePath).toLowerCase();
+function streamFile(filePath: string, res: ServerResponse) {
+    const ext = extname(filePath).toLowerCase();
     const ctype = contentType[ext] ?? "application/octet-stream"
     res.setHeader("Content-Type", ctype);
     const stream = createReadStream(filePath);
@@ -20,7 +18,7 @@ function log(msg: string): void {
     console.log(`${ts} ${msg}`);
 }
 
-function logRequest(req: http.IncomingMessage): void {
+function logRequest(req: IncomingMessage): void {
     const addr = (req.socket && (req.socket.remoteAddress || req.socket.remoteFamily)) || "-";
     const method = req.method || "-";
     const url = req.url || "-";
@@ -45,71 +43,50 @@ const contentType: Record<string, string> = {
     ".woff2": "font/woff2"
 }
 
-async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
+async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     logRequest(req)
 
-    const urlPath = decodeURIComponent(new URL(req.url || "/", `http://localhost`).pathname);
-    const safePath = path.normalize(path.join(root, urlPath));
-    if (!safePath.startsWith(path.normalize(root + path.sep))) {
-        res.statusCode = 403;
-        res.end("Forbidden");
-        return;
+    if (req.url?.startsWith('/api')) {
+        log('TODO: api')
+    } else if (await tryServeFile(req, res, distPath)) {
+        return
     }
-
-    const stats = await stat(safePath).catch(() => null);
-    if (!stats) {
-        res.statusCode = 404;
-        res.end("Not found");
-        return;
-    }
-
-    if (stats.isDirectory()) {
-        const index = path.join(safePath, "index.html");
-        const indexStats = await stat(index).catch(() => null);
-        if (indexStats && indexStats.isFile()) {
-            streamFile(index, res);
-            return;
-        }
-
-        const entries = await readdir(safePath, { withFileTypes: true }).catch(() => null);
-        if (!entries) {
-            res.statusCode = 500;
-            res.end("Server error");
-            return;
-        }
-
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.write("<!doctype html><meta charset='utf-8'><title>Index</title><ul>");
-        const rel = path.relative(root, safePath);
-        if (rel) {
-            const up = path.posix.join("/", rel.split(path.sep).map(() => "..").join("/"));
-            res.write(`<li><a href="${up}">..</a></li>`);
-        }
-        for (const e of entries) {
-            const name = e.name + (e.isDirectory() ? "/" : "");
-            const href = encodeURI(
-                path.posix.join(
-                    "/",
-                    path.relative(root, path.join(safePath, e.name)).split(path.sep).join("/")
-                )
-            );
-            res.write(`<li><a href="${href}">${name}</a></li>`);
-        }
-        res.end("</ul>");
-        return;
-    }
-
-    if (stats.isFile()) {
-        streamFile(safePath, res);
-        return;
-    }
-
-    res.statusCode = 403;
-    res.end("Forbidden");
+    res.statusCode = 403
+    res.end("Forbidden")
 }
 
-const server = http.createServer((req, res) => {
+async function tryServeFile(req: IncomingMessage, res: ServerResponse, root: string): Promise<boolean> {
+    let urlPath = decodeURIComponent(req.url ?? '/');
+    if (urlPath === '/') urlPath = '/index.html'
+    const truePath = normalize(join(root, urlPath));
+    if (!truePath.startsWith(normalize(root + sep))) {
+        return false
+    }
+
+    const stats = await stat(truePath);
+    if (stats.isFile()) {
+        streamFile(truePath, res)
+        return true
+    }
+    return false
+}
+
+const port = parseInt(process.env.WEBFS_PORT ?? "3000", 10);
+const distPath = process.env.WEBFS_DIST!;
+const rootPath = process.env.WEBFS_ROOT!;
+
+if (!distPath) {
+    log('no dist path')
+    exit(1)
+}
+if (!rootPath) {
+    log('no root path')
+    exit(1)
+}
+
+const server = createServer((req, res) => {
     handleRequest(req, res).catch(e => {
+        log('request error')
         console.error(e)
         if (!res.headersSent) res.statusCode = 500;
         res.end("Server error");
@@ -117,5 +94,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, () => {
-    console.log(`Serving ${root} at http://localhost:${port}/`);
+    log(`Serving ${rootPath} at port ${port}/`);
 });
