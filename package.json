@@ -1,0 +1,22 @@
+{
+    "name": "webfs",
+    "version": "0.0.1",
+    "description": "Access and edit local files from browser",
+    "scripts": {
+        "build:fe": "tsc && vite build",
+        "watch:fe": "find src | entr npm run build:fe",
+        "start": "npm run build:fe && bun src/server.ts"
+    },
+    "type": "module",
+    "license": "MIT",
+    "packageManager": "pnpm@9.4.0",
+    "devDependencies": {
+        "@types/node": "24.5.2",
+        "typescript": "5.9.2",
+        "vite": "7.1.6",
+        "vite-plugin-solid": "2.11.8"
+    },
+    "dependencies": {
+        "solid-js": "1.9.9"
+    }
+}
