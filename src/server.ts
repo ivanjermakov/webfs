@@ -1,46 +1,49 @@
-import { createReadStream } from "fs";
-import { readdir, stat } from "fs/promises";
-import { createServer, IncomingMessage, ServerResponse } from "http";
-import { extname, join, normalize, relative, sep } from "path";
-import { exit } from "process";
+import { createReadStream } from 'fs'
+import { readdir, stat } from 'fs/promises'
+import { createServer, IncomingMessage, ServerResponse } from 'http'
+import { extname, join, normalize, relative, sep } from 'path'
+import { exit } from 'process'
 
 function streamFile(filePath: string, res: ServerResponse) {
-    const ext = extname(filePath).toLowerCase();
-    const ctype = contentType[ext] ?? "application/octet-stream"
-    res.setHeader("Content-Type", ctype);
-    const stream = createReadStream(filePath);
-    stream.on("error", () => { res.statusCode = 500; res.end("Server error"); });
-    stream.pipe(res);
+    const ext = extname(filePath).toLowerCase()
+    const ctype = contentType[ext] ?? 'application/octet-stream'
+    res.setHeader('Content-Type', ctype)
+    const stream = createReadStream(filePath)
+    stream.on('error', () => {
+        res.statusCode = 500
+        res.end('Server error')
+    })
+    stream.pipe(res)
 }
 
 function log(msg: string): void {
-    const ts = new Date().toISOString();
-    console.log(`${ts} ${msg}`);
+    const ts = new Date().toISOString()
+    console.log(`${ts} ${msg}`)
 }
 
 function logRequest(req: IncomingMessage): void {
-    const addr = (req.socket && (req.socket.remoteAddress || req.socket.remoteFamily)) || "-";
-    const method = req.method || "-";
-    const url = req.url || "-";
-    log(`${addr} "${method} ${url}"`);
+    const addr = (req.socket && (req.socket.remoteAddress || req.socket.remoteFamily)) || '-'
+    const method = req.method || '-'
+    const url = req.url || '-'
+    log(`${addr} "${method} ${url}"`)
 }
 
 const contentType: Record<string, string> = {
-    ".html": "text/html; charset=utf-8",
-    ".htm": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".json": "application/json; charset=utf-8",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".svg": "image/svg+xml",
-    ".txt": "text/plain; charset=utf-8",
-    ".wav": "audio/wav",
-    ".mp4": "video/mp4",
-    ".woff": "font/woff",
-    ".woff2": "font/woff2"
+    '.html': 'text/html; charset=utf-8',
+    '.htm': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.txt': 'text/plain; charset=utf-8',
+    '.wav': 'audio/wav',
+    '.mp4': 'video/mp4',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2'
 }
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
@@ -52,18 +55,18 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
         return
     }
     res.statusCode = 403
-    res.end("Forbidden")
+    res.end('Forbidden')
 }
 
 async function tryServeFile(req: IncomingMessage, res: ServerResponse, root: string): Promise<boolean> {
-    let urlPath = decodeURIComponent(req.url ?? '/');
+    let urlPath = decodeURIComponent(req.url ?? '/')
     if (urlPath === '/') urlPath = '/index.html'
-    const truePath = normalize(join(root, urlPath));
+    const truePath = normalize(join(root, urlPath))
     if (!truePath.startsWith(normalize(root + sep))) {
         return false
     }
 
-    const stats = await stat(truePath);
+    const stats = await stat(truePath)
     if (stats.isFile()) {
         streamFile(truePath, res)
         return true
@@ -71,9 +74,9 @@ async function tryServeFile(req: IncomingMessage, res: ServerResponse, root: str
     return false
 }
 
-const port = parseInt(process.env.WEBFS_PORT ?? "3000", 10);
-const distPath = process.env.WEBFS_DIST!;
-const rootPath = process.env.WEBFS_ROOT!;
+const port = parseInt(process.env.WEBFS_PORT ?? '3000', 10)
+const distPath = process.env.WEBFS_DIST!
+const rootPath = process.env.WEBFS_ROOT!
 
 if (!distPath) {
     log('no dist path')
@@ -88,11 +91,11 @@ const server = createServer((req, res) => {
     handleRequest(req, res).catch(e => {
         log('request error')
         console.error(e)
-        if (!res.headersSent) res.statusCode = 500;
-        res.end("Server error");
+        if (!res.headersSent) res.statusCode = 500
+        res.end('Server error')
     })
-});
+})
 
 server.listen(port, () => {
-    log(`Serving ${rootPath} at port ${port}/`);
-});
+    log(`Serving ${rootPath} at port ${port}/`)
+})
