@@ -1,12 +1,12 @@
 import { createReadStream } from 'fs'
 import { readdir, stat } from 'fs/promises'
 import { createServer, IncomingMessage, ServerResponse } from 'http'
-import { extname, join, normalize, relative, sep } from 'path'
+import { extname, join, normalize, relative, resolve, sep } from 'path'
 import { exit } from 'process'
 
 function streamFile(filePath: string, res: ServerResponse) {
     const ext = extname(filePath).toLowerCase()
-    const ctype = contentType[ext] ?? 'application/octet-stream'
+    const ctype = contentType[ext] ?? contentType['.txt']
     res.setHeader('Content-Type', ctype)
     const stream = createReadStream(filePath)
     stream.on('error', () => {
@@ -16,9 +16,10 @@ function streamFile(filePath: string, res: ServerResponse) {
     stream.pipe(res)
 }
 
-function log(msg: string): void {
+function log(msg: string, e?: Error): void {
     const ts = new Date().toISOString()
     console.log(`${ts} ${msg}`)
+    if (e) console.trace(e)
 }
 
 function logRequest(req: IncomingMessage): void {
@@ -48,30 +49,79 @@ const contentType: Record<string, string> = {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     logRequest(req)
+    const host = req.headers.host ?? 'localhost';
+    const rawUrl = `http://${host}${req.url ?? '/'}`;
+    const url = new URL(rawUrl);
 
-    if (req.url?.startsWith('/api')) {
-        log('TODO: api')
-    } else if (await tryServeFile(req, res, distPath)) {
+    if (url.pathname.startsWith('/api')) {
+        if (req.url === '/api/files') {
+            const files = await listFiles(rootPath)
+            res.statusCode = 200
+            res.setHeader("Content-Type", contentType['.json']);
+            res.end(JSON.stringify(files))
+            return
+        }
+        if (url.pathname.startsWith('/api/file')) {
+            const filePath = url.searchParams.get('path')
+            if (filePath === undefined) throw Error('no path')
+            const truePath = normalize(join(rootPath, filePath!))
+            const stats = await stat(truePath)
+            if (stats.isFile()) {
+                streamFile(truePath, res)
+                return
+            }
+        }
+        throw Error()
+    }
+
+    if (await tryServeFile(req.url, res, distPath)) {
         return
     }
-    res.statusCode = 403
-    res.end('Forbidden')
+
+    if (await tryServeFile('/', res, distPath)) {
+        return
+    }
+
+    throw Error()
 }
 
-async function tryServeFile(req: IncomingMessage, res: ServerResponse, root: string): Promise<boolean> {
-    let urlPath = decodeURIComponent(req.url ?? '/')
-    if (urlPath === '/') urlPath = '/index.html'
-    const truePath = normalize(join(root, urlPath))
-    if (!truePath.startsWith(normalize(root + sep))) {
+async function tryServeFile(url: string | undefined, res: ServerResponse, root: string): Promise<boolean> {
+    try {
+        let urlPath = decodeURIComponent(url ?? '/')
+        if (urlPath === '/') urlPath = '/index.html'
+        const truePath = normalize(join(root, urlPath))
+        if (!truePath.startsWith(normalize(root + sep))) return false
+
+        const stats = await stat(truePath)
+        if (stats.isFile()) {
+            streamFile(truePath, res)
+            return true
+        }
+        return false
+    } catch (e) {
         return false
     }
+}
 
-    const stats = await stat(truePath)
-    if (stats.isFile()) {
-        streamFile(truePath, res)
-        return true
+async function listFiles(root: string): Promise<string[]> {
+    const rootAbs = resolve(root);
+    const results: string[] = [];
+
+    async function walk(dir: string) {
+        const entries = await readdir(dir, { withFileTypes: true });
+        await Promise.all(entries.map(async (ent) => {
+            const abs = join(dir, ent.name);
+            if (ent.isDirectory()) {
+                await walk(abs);
+            } else if (ent.isFile()) {
+                const rel = relative(rootAbs, abs).split(sep).join('/');
+                results.push(rel);
+            }
+        }));
     }
-    return false
+
+    await walk(rootAbs);
+    return results;
 }
 
 const port = parseInt(process.env.WEBFS_PORT ?? '3000', 10)
@@ -89,9 +139,8 @@ if (!rootPath) {
 
 const server = createServer((req, res) => {
     handleRequest(req, res).catch(e => {
-        log('request error')
-        console.error(e)
-        if (!res.headersSent) res.statusCode = 500
+        log('request error', e)
+        res.statusCode = 500
         res.end('Server error')
     })
 })
