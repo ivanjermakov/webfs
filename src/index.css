@@ -129,7 +129,13 @@ select {
 
 #root {
     display: flex;
+    flex-direction: column;
     overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
 }
 
 .directory {
