@@ -18,6 +18,7 @@
         --fg: #ffffff;
         --fg2: #eeeeee;
         --fg3: #aaaaaa;
+        --special: #e975ff;
     }
 }
 
@@ -136,7 +137,8 @@ select {
 .header {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: .5rem;
+    padding: .1rem;
 }
 
 .directory {
@@ -146,7 +148,6 @@ select {
 }
 
 textarea {
-    width: 100%;
     height: 100%;
     margin: 0;
     padding: 1ch;

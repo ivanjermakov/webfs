@@ -35,17 +35,30 @@ const Main: Component = () => {
 
     return (
         <>
-            <div class="header">
-                <button type="button" onClick={() => (window.location.href = '/')}>
-                    back
-                </button>
-                <span>{file()?.path ?? 'directory'}</span>
-            </div>
             <Switch>
                 <Match when={file() !== undefined}>
+                    <div class="header">
+                        <button type="button" onClick={() => (window.location.href = '/')}>
+                            back
+                        </button>
+                        <span>{file()!.path}</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const params = new URLSearchParams({ path: file()!.path })
+                                window.open(`/api/file?${params}`)
+                            }}
+                            style={{ 'margin-left': 'auto' }}
+                        >
+                            raw
+                        </button>
+                    </div>
                     <textarea onInput={e => updateContent(e.target.value)}>{file()!.content}</textarea>
                 </Match>
                 <Match when={files() !== undefined}>
+                    <div class="header">
+                        <span>directory</span>
+                    </div>
                     <div class="directory">
                         <For each={files()}>{file => <a href={`/${file}`}>{file}</a>}</For>
                     </div>
