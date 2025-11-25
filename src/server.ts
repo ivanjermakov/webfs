@@ -1,7 +1,7 @@
 import { createReadStream } from 'fs'
-import { readdir, stat } from 'fs/promises'
-import { createServer, IncomingMessage, ServerResponse } from 'http'
+import { IncomingMessage, ServerResponse, createServer } from 'http'
 import { extname, join, normalize, relative, resolve, sep } from 'path'
+import { readdir, stat, writeFile } from 'fs/promises'
 import { exit } from 'process'
 
 function streamFile(filePath: string, res: ServerResponse) {
@@ -14,6 +14,26 @@ function streamFile(filePath: string, res: ServerResponse) {
         res.end('Server error')
     })
     stream.pipe(res)
+}
+
+function body(req: IncomingMessage): Promise<ArrayBuffer> {
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+        const chunks: Buffer[] = []
+        req.on('data', chunk => chunks.push(chunk))
+        req.on('end', () => resolve(joinBuffers(chunks)))
+        req.on('error', reject)
+    })
+}
+
+function joinBuffers(buffers: Buffer[]): ArrayBuffer {
+    const totalLength = buffers.reduce((sum, b) => sum + b.byteLength, 0)
+    const result = new Uint8Array(totalLength)
+    let offset = 0
+    for (const buf of buffers) {
+        result.set(buf, offset)
+        offset += buf.byteLength
+    }
+    return result.buffer
 }
 
 function log(msg: string, e?: Error): void {
@@ -49,15 +69,15 @@ const contentType: Record<string, string> = {
 
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     logRequest(req)
-    const host = req.headers.host ?? 'localhost';
-    const rawUrl = `http://${host}${req.url ?? '/'}`;
-    const url = new URL(rawUrl);
+    const host = req.headers.host ?? 'localhost'
+    const rawUrl = `http://${host}${req.url ?? '/'}`
+    const url = new URL(rawUrl)
 
     if (url.pathname.startsWith('/api')) {
         if (req.url === '/api/files') {
             const files = await listFiles(rootPath)
             res.statusCode = 200
-            res.setHeader("Content-Type", contentType['.json']);
+            res.setHeader('Content-Type', contentType['.json'])
             res.end(JSON.stringify(files))
             return
         }
@@ -67,7 +87,15 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
             const truePath = normalize(join(rootPath, filePath!))
             const stats = await stat(truePath)
             if (stats.isFile()) {
-                streamFile(truePath, res)
+                if (req.method === 'POST') {
+                    const content = await body(req)
+                    await writeFile(truePath, new DataView(content))
+                    log(`written ${content.byteLength}B to ${truePath}`)
+                    res.statusCode = 200
+                    res.end()
+                } else {
+                    streamFile(truePath, res)
+                }
                 return
             }
         }
@@ -104,27 +132,29 @@ async function tryServeFile(url: string | undefined, res: ServerResponse, root: 
 }
 
 async function listFiles(root: string): Promise<string[]> {
-    const rootAbs = resolve(root);
-    const results: string[] = [];
+    const rootAbs = resolve(root)
+    const results: string[] = []
 
     async function walk(dir: string) {
-        const entries = await readdir(dir, { withFileTypes: true });
-        await Promise.all(entries.map(async (ent) => {
-            const abs = join(dir, ent.name);
-            if (ent.isDirectory()) {
-                await walk(abs);
-            } else if (ent.isFile()) {
-                const rel = relative(rootAbs, abs).split(sep).join('/');
-                results.push(rel);
-            }
-        }));
+        const entries = await readdir(dir, { withFileTypes: true })
+        await Promise.all(
+            entries.map(async ent => {
+                const abs = join(dir, ent.name)
+                if (ent.isDirectory()) {
+                    await walk(abs)
+                } else if (ent.isFile()) {
+                    const rel = relative(rootAbs, abs).split(sep).join('/')
+                    results.push(rel)
+                }
+            })
+        )
     }
 
-    await walk(rootAbs);
-    return results;
+    await walk(rootAbs)
+    return results
 }
 
-const port = parseInt(process.env.WEBFS_PORT ?? '3000', 10)
+const port = Number.parseInt(process.env.WEBFS_PORT ?? '3000', 10)
 const distPath = process.env.WEBFS_DIST!
 const rootPath = process.env.WEBFS_ROOT!
 
