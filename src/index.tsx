@@ -40,6 +40,7 @@ const Main: Component = () => {
     const [renderedMd] = createResource(file, async file_ => {
         const content = file_?.content
         if (content === undefined) return undefined
+        // TODO: repair <img> urls
         const html = await parse(content)
         console.log(html)
         return html

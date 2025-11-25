@@ -138,15 +138,17 @@ async function listFiles(root: string): Promise<string[]> {
     async function walk(dir: string) {
         const entries = await readdir(dir, { withFileTypes: true })
         await Promise.all(
-            entries.map(async ent => {
-                const abs = join(dir, ent.name)
-                if (ent.isDirectory()) {
-                    await walk(abs)
-                } else if (ent.isFile()) {
-                    const rel = relative(rootAbs, abs).split(sep).join('/')
-                    results.push(rel)
-                }
-            })
+            entries
+                .filter(e => !e.name.startsWith('.'))
+                .map(async ent => {
+                    const abs = join(dir, ent.name)
+                    if (ent.isDirectory()) {
+                        await walk(abs)
+                    } else if (ent.isFile()) {
+                        const rel = relative(rootAbs, abs).split(sep).join('/')
+                        results.push(rel)
+                    }
+                })
         )
     }
 

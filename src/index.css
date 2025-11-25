@@ -2,7 +2,7 @@
 
 :root {
     --bg: #ffffff;
-    --bg2: #f4f4f4;
+    --bg2: #f6f6f6;
     --bg3: #dddddd;
     --fg: #000000;
     --fg2: #111111;
@@ -13,8 +13,8 @@
 @media (prefers-color-scheme: dark) {
     :root {
         --bg: #111111;
-        --bg2: #222222;
-        --bg3: #444444;
+        --bg2: #151515;
+        --bg3: #333333;
         --fg: #ffffff;
         --fg2: #eeeeee;
         --fg3: #aaaaaa;
@@ -147,6 +147,10 @@ select {
     width: 100%;
     display: flex;
     flex-direction: column;
+    overflow: auto;
+}
+
+.rendered {
     overflow: auto;
 }
 
