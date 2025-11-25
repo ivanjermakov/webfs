@@ -176,5 +176,5 @@ const server = createServer((req, res) => {
 })
 
 server.listen(port, () => {
-    log(`Serving ${rootPath} at port ${port}/`)
+    log(`Serving ${rootPath} at port ${port}`)
 })

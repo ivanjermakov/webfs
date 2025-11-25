@@ -92,10 +92,6 @@ textarea {
     font-size: 1rem;
 }
 
-input[type="range"] {
-    accent-color: var(--special)
-}
-
 button {
     background-color: var(--bg2);
     color: var(--fg);
@@ -139,6 +135,12 @@ select {
     align-items: center;
     gap: .5rem;
     padding: .1rem;
+
+    .section {
+        display: flex;
+        align-items: center;
+        gap: .2rem;
+    }
 }
 
 .directory {
