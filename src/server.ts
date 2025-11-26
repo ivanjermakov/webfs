@@ -85,18 +85,27 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
             const filePath = url.searchParams.get('path')
             if (filePath === undefined) throw Error('no path')
             const truePath = normalize(join(rootPath, filePath!))
-            const stats = await stat(truePath)
-            if (stats.isFile()) {
-                if (req.method === 'POST') {
-                    const content = await body(req)
-                    await writeFile(truePath, new DataView(content))
-                    log(`written ${content.byteLength}B to ${truePath}`)
-                    res.statusCode = 200
-                    res.end()
-                } else {
-                    streamFile(truePath, res)
+            const stats = await stat(truePath).catch(() => undefined)
+            if (req.method === 'POST') {
+                const content = await body(req)
+                if (!stats?.isFile()) {
+                    log(`creating file ${truePath}`)
                 }
+                await writeFile(truePath, new DataView(content))
+                log(`written ${content.byteLength}B to ${truePath}`)
+                res.statusCode = 200
+                res.end()
                 return
+            } else {
+                if (stats?.isFile()) {
+                    streamFile(truePath, res)
+                    return
+                } else {
+                    log(`not yet existing file opened ${truePath}`)
+                    res.statusCode = 204
+                    res.end()
+                    return
+                }
             }
         }
         throw Error()
