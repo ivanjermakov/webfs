@@ -41,9 +41,7 @@ const Main: Component = () => {
         const content = file_?.content
         if (content === undefined) return undefined
         // TODO: repair <img> urls
-        const html = await parse(content)
-        console.log(html)
-        return html
+        return await parse(content)
     })
 
     return (
@@ -54,7 +52,7 @@ const Main: Component = () => {
                         <button type="button" onClick={() => (window.location.href = '/')}>
                             back
                         </button>
-                        <span>{file()!.path}</span>
+                        <span class="path">{file()!.path}</span>
                         <div class="section" style={{ 'margin-left': 'auto' }}>
                             <button
                                 type="button"

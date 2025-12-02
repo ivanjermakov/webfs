@@ -141,6 +141,11 @@ select {
         align-items: center;
         gap: .2rem;
     }
+
+    .path {
+        white-space: nowrap;
+        overflow-x: auto;
+    }
 }
 
 .directory {
