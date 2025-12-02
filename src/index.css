@@ -80,7 +80,7 @@ i {
     color: var(--fg);
 }
 
-*:focus {
+button:focus, input:focus, select:focus {
     outline: 1px solid var(--special);
 }
 
